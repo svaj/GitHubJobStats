@@ -1,7 +1,10 @@
 #!/usr/bin/python3 # Just in-case the user didn't set up a virtual env :)
-import requests
 import json
 import argparse
+import asyncio
+import async_timeout
+import aiohttp
+from urllib.parse import quote
 
 """
 This application uses the GitHub API to show a breakdown of jobs by city and then by experience.
@@ -32,13 +35,37 @@ Sourced: 1,123 job postings
 
 """
 
-def get_jobs(location="Portland"):
+MAX_JOBS_PER_PAGE = 50  # from https://jobs.github.com/api
+
+
+async def get_jobs(session, location="Portland", page=0):
     """
     Grabs the jobs for a city from GitHub's API.
-    :param location: The location (city, zip, or other location search term)
+    :param session: The Async session.
+    :param location: The location (city, zip, or other location search term) to fetch.
+    :param page: The current page of results to fetch.
     :return: a list of jobs for this location.
     """
     #TODO: Reminder to check for pagination.
+    url = "https://jobs.github.com/positions.json?location={}&page={}".format(quote(location), page)
+    with async_timeout.timeout(10):  # TODO: Set this from an optional command line arg.
+        async with session.get(url) as response:
+            print("Got jobs page {} for {}".format(page, location))
+            if response.status != 200:
+                raise Exception("Failed getting job listings for {}, page {}".format(location, page))
+            # parse jobs from json
+            json_text = await response.text()
+            try:
+                jobs = json.loads(json_text)
+            except:
+                raise Exception("Could not load JSON from GitHub API response for {}, page {}".format(location, page))
+
+            # if results >= 50, attempt to add on another page
+            if len(jobs) >= MAX_JOBS_PER_PAGE:
+                jobs.extend(get_jobs(session, location, page + 1))
+
+            return jobs
+
 
 def parse_jobs(jobs):
     """
@@ -46,6 +73,12 @@ def parse_jobs(jobs):
     :param jobs: json describing a set of jobs
     :return: Returns a dict of dicts of Language with Experience levels: {'Python':{'0-2 years':44}, 'Ruby': {'1-4 years': 3}}
     """
+    print("Parsing jobs")
+    for j in jobs:
+        # Find out Requirements
+        description = j['description']
+        print(description.encode("utf-8"))
+
 
 
 def display_city_jobs(location, jobs):
@@ -55,20 +88,30 @@ def display_city_jobs(location, jobs):
     :param jobs: The parsed jobs from parse_jobs
     :return: None
     """
+    print("{}:".format(location))
 
 
-def main():
+
+async def main(loop):
     """ Entry point of our application, set up the command line args, main execution of our application."""
     parser = argparse.ArgumentParser()
     parser.add_argument("-l", "--locations", nargs="+", help="<Required> List of locations to display.", required=True)
     job_total = 0
     args = parser.parse_args()
+
+    location_jobs = {}
     for location in args.locations:
-        jobs = get_jobs(location=location) # TODO: grab these upfront, thread them so we aren't waiting too long.
-        parsed_jobs = parse_jobs(jobs)
+        async with aiohttp.ClientSession(loop=loop) as session:
+            jobs = await get_jobs(session, location)
+            location_jobs[location] = jobs
+            job_total += len(jobs)
+    for location in args.locations:
+        parsed_jobs = parse_jobs(location_jobs[location])
         display_city_jobs(location, jobs)
     print("Sourced {:n} job postings".format(job_total))
     return
 
 # Run the application.
-main()
+if __name__ == '__main__':
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main(loop))
