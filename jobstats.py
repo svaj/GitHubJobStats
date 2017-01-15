@@ -46,7 +46,6 @@ async def get_jobs(session, location="Portland", page=0):
     :param page: The current page of results to fetch.
     :return: a list of jobs for this location.
     """
-    #TODO: Reminder to check for pagination.
     url = "https://jobs.github.com/positions.json?location={}&page={}".format(quote(location), page)
     with async_timeout.timeout(10):  # TODO: Set this from an optional command line arg.
         async with session.get(url) as response:
@@ -60,7 +59,7 @@ async def get_jobs(session, location="Portland", page=0):
             except:
                 raise Exception("Could not load JSON from GitHub API response for {}, page {}".format(location, page))
 
-            # if results >= 50, attempt to add on another page
+            # if results >= 50, attempt to add on another page of results
             if len(jobs) >= MAX_JOBS_PER_PAGE:
                 jobs.extend(get_jobs(session, location, page + 1))
 
@@ -75,9 +74,12 @@ def parse_jobs(jobs):
     """
     print("Parsing jobs")
     for j in jobs:
-        # Find out Requirements
+        # Find out Requirements, it looks like these are somewhere in Description -- some html that is free-form
+        # There might not be any hard language requirements stated either!
+        # There might not be any exp level mentioned as well!
         description = j['description']
         print(description.encode("utf-8"))
+        # TODO: find language requirements and exp levels in description, if it is even there.
 
 
 
@@ -89,6 +91,7 @@ def display_city_jobs(location, jobs):
     :return: None
     """
     print("{}:".format(location))
+    # TODO: print by language & experience
 
 
 
@@ -100,11 +103,13 @@ async def main(loop):
     args = parser.parse_args()
 
     location_jobs = {}
+    # Perform all our HTTP requests up front.
     for location in args.locations:
         async with aiohttp.ClientSession(loop=loop) as session:
             jobs = await get_jobs(session, location)
             location_jobs[location] = jobs
             job_total += len(jobs)
+    # now get the lang. requirements and exp levels and then display them.
     for location in args.locations:
         parsed_jobs = parse_jobs(location_jobs[location])
         display_city_jobs(location, jobs)
