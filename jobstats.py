@@ -76,7 +76,7 @@ def parse_jobs(jobs):
     """
     Parses the json jobs from GitHub.
     :param jobs: json describing a set of jobs
-    :return: Returns a dict of dicts of Language with Experience levels: {'Python':{'0-2 years':44}, 'Ruby': {'1-4 years': 3}}
+    :return: Returns a dict of dicts of Language with Experience levels: {'Python':{'0-2 years': ['job1','job2']}, 'Ruby': {'1-4 years': ['job1', 'job3]}}
     """
     parsed_jobs = {}
 
@@ -89,7 +89,7 @@ def parse_jobs(jobs):
         # Remove non-ascii chars for easier processing.
         description = re.sub(r'[^\x00-\x7F]+', ' ', description)
 
-        # TODO: find language requirements and exp levels in description, if it is even there.
+        # find language requirements and exp levels in description, if it is even there.
         # This is pretty gross and I'm not sure of a good way to do better -- save for something crazy with NLP / http://www.nltk.org/
         # Let's just check for the mere existence of the language keywords in the description.
         for lang in LANGS_TO_SCAN_FOR:
@@ -121,8 +121,19 @@ def display_city_jobs(location, jobs):
     :return: None
     """
     print("{}:".format(location))
-    # TODO: print by language & experience
-    print(jobs)
+    # print by language & experience
+    # Get number of unique jobs in this location:
+    unique_jobs = []
+    for lang in jobs:
+        for level in jobs[lang]:
+            unique_jobs += jobs[lang][level]
+    unique_jobs = set(unique_jobs)  # Now we have the unique values
+    # Proceed to display
+    for lang in jobs:
+        print("  - {}:".format(lang))
+        for level in jobs[lang]:
+            pct = len(jobs[lang][level])/len(unique_jobs)*100
+            print("    - {}: {:.0f}%".format(level, pct))
 
 
 async def main(loop):
