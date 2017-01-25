@@ -1,5 +1,5 @@
 
-This application uses the GitHub API to show a breakdown of jobs by city and then by experience.
+This application uses the GitHub Jobs API to show a breakdown of jobs by city and then by experience.
 
 It should output something akin to:
 
@@ -12,6 +12,7 @@ Boston:
     - 0-2 years: 30%
     - 3-5 years: 15%
     - 5+ years: 8%
+
 San Francisco:
   - Node:
     - 0-2 years: 25%
