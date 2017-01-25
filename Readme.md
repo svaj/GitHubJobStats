@@ -38,7 +38,7 @@ Install requirements via pip3: `pip3 install -r requirements.txt`
 
 Running
 ------
-You may run the program via `python3 jobstats.py -l "Los Angeles" "San Francisco" Portland "New York"`.  Feel free to
+You may run the program via `python jobstats.py -l "Los Angeles" "San Francisco" Portland "New York"`.  Feel free to
 substitute whatever location keywords you desire.
 
 Notes
