@@ -1,8 +1,16 @@
 import pytest
+import asyncio
+import async_timeout
 from jobstats import *
 
-def test_get_jobs():
-    return
+async def test_get_jobs():
+    """ Ensure we get at least 1 job. """
+    for location in ['San Francisco', 'Los Angeles', 'New York']:
+        async with aiohttp.ClientSession(loop=loop) as session:
+            jobs = await get_jobs(session, location)
+            location_jobs[location] = jobs
+            job_total += len(jobs)
+    assert job_total > 0
 
 def test_parse_jobs():
     jobs = [
