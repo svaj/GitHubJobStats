@@ -5,6 +5,8 @@ import asyncio
 import async_timeout
 import aiohttp
 from urllib.parse import quote
+from bs4 import BeautifulSoup #  to strip HTML.
+import re
 
 """
 This application uses the GitHub API to show a breakdown of jobs by city and then by experience.
@@ -36,6 +38,10 @@ Sourced: 1,123 job postings
 """
 
 MAX_JOBS_PER_PAGE = 50  # from https://jobs.github.com/api
+
+# For a more comprehensive list: https://en.wikipedia.org/wiki/List_of_programming_languages
+LANGS_TO_SCAN_FOR = {'python', 'ruby', 'nodejs', 'javascript', 'C', 'C++', 'C#', 'java', 'scala', 'go', 'php'}
+#  TODO: allow this to be overridden by a command line arg.
 
 
 async def get_jobs(session, location="Portland", page=0):
@@ -72,14 +78,38 @@ def parse_jobs(jobs):
     :param jobs: json describing a set of jobs
     :return: Returns a dict of dicts of Language with Experience levels: {'Python':{'0-2 years':44}, 'Ruby': {'1-4 years': 3}}
     """
-    print("Parsing jobs")
+    parsed_jobs = {}
+
     for j in jobs:
         # Find out Requirements, it looks like these are somewhere in Description -- some html that is free-form
         # There might not be any hard language requirements stated either!
         # There might not be any exp level mentioned as well!
-        description = j['description']
-        print(description.encode("utf-8"))
+
+        description = BeautifulSoup(j['description'], "html.parser").get_text().lower()  # Strip HTML from description.
+        # Remove non-ascii chars for easier processing.
+        description = re.sub(r'[^\x00-\x7F]+', ' ', description)
+
         # TODO: find language requirements and exp levels in description, if it is even there.
+        # This is pretty gross and I'm not sure of a good way to do better -- save for something crazy with NLP / http://www.nltk.org/
+        # Let's just check for the mere existence of the language keywords in the description.
+        for lang in LANGS_TO_SCAN_FOR:
+            if lang in description:
+                # Keyword found - let's see the level of exp required!
+
+                if lang not in parsed_jobs:
+                    parsed_jobs[lang] = {}
+                # Try to find a level of experience needed (default "Not specified")
+                matches = re.findall(r'[\d]+-[\d]+ years', description)
+                if matches:
+                    # For now, just take the first match. of ??-?? years experience
+                    level = matches[0]
+                else:
+                    level = "Not specified"
+                if level not in parsed_jobs[lang]:
+                    parsed_jobs[lang][level] = [j['url']]
+                else:
+                    parsed_jobs[lang][level].append(j['url'])
+    return parsed_jobs
 
 
 
@@ -92,7 +122,7 @@ def display_city_jobs(location, jobs):
     """
     print("{}:".format(location))
     # TODO: print by language & experience
-
+    print(jobs)
 
 
 async def main(loop):
@@ -112,7 +142,7 @@ async def main(loop):
     # now get the lang. requirements and exp levels and then display them.
     for location in args.locations:
         parsed_jobs = parse_jobs(location_jobs[location])
-        display_city_jobs(location, jobs)
+        display_city_jobs(location, parsed_jobs)
     print("Sourced {:n} job postings".format(job_total))
     return
 
